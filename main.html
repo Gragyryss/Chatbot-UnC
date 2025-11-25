@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Chatbot UnC - Protótipo</title>
+  <style>
+    :root{
+      --primary:#1d3557;
+      --bg:#f5f5f5;
+    }
+    body{
+      margin:0;
+      font-family:Arial,system-ui,-apple-system,"Segoe UI",Roboto;
+      background:var(--bg);
+      -webkit-font-smoothing:antialiased;
+    }
+
+    /* Botão flutuante */
+    #chatToggle{
+      position:fixed;
+      right:20px;
+      bottom:20px;
+      width:60px;height:60px;border-radius:50%;
+      background:var(--primary);color:#fff;border:0;
+      font-size:26px;cursor:pointer;z-index:2000;
+      box-shadow:0 6px 18px rgba(0,0,0,.18);
+    }
+
+    /* Janela de chat (pop-up) */
+    #chatWindow{
+      position:fixed;
+      right:20px;
+      bottom:90px;
+      width:360px;
+      max-width:calc(100vw - 40px);
+      height:520px;
+      background:#fff;border-radius:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,.2);
+      display:none;flex-direction:column;overflow:hidden;z-index:1999;
+    }
+
+    .chat-header{
+      background:var(--primary);color:#fff;padding:10px 12px;
+      display:flex;align-items:center;gap:10px;
+    }
+
+    .chat-avatar{ width:40px;height:40px;border-radius:50%;overflow:hidden;flex-shrink:0;}
+    .chat-avatar img{width:100%;height:100%;object-fit:cover;display:block;}
+    .chat-title{flex:1;font-weight:600;}
+
+    .close-btn{cursor:pointer;font-size:20px;padding:2px 6px;border-radius:6px;background:transparent;color:#fff;border:0}
+
+    .messages{
+      flex:1;padding:12px;overflow:auto;background:linear-gradient(180deg,#fafafa,#fff);
+    }
+
+    .msg{max-width:84%;margin-bottom:10px;padding:10px 12px;border-radius:12px;line-height:1.35;word-wrap:break-word}
+    .msg.user{margin-left:auto;background:var(--primary);color:#fff;border-bottom-right-radius:4px}
+    .msg.bot{margin-right:auto;background:#eee;color:#111;border-bottom-left-radius:4px}
+
+    .input-area{display:flex;padding:10px;border-top:1px solid #eee;gap:8px;background:#fafafa}
+    .input-area input[type="text"]{
+      flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;
+    }
+    .input-area button{background:var(--primary);color:#fff;border:0;padding:10px 14px;border-radius:8px;cursor:pointer}
+
+    .docs-area{padding:10px;border-top:1px dashed #eee;background:#fff}
+    .doc-item{background:#f4f7fb;padding:8px;border-radius:6px;margin-bottom:8px;font-size:14px}
+    a.inline-link{color:var(--primary);text-decoration:none;font-weight:600}
+  </style>
+</head>
+<body>
+
+  <!-- Botão flutuante -->
+  <button id="chatToggle" aria-label="Abrir chat">💬</button>
+
+  <!-- Janela de chat -->
+  <div id="chatWindow" role="dialog" aria-label="Chat de atendimento">
+    <div class="chat-header">
+      <div class="chat-avatar">
+        <!-- Substitua chatbot.png pelo arquivo que quiser -->
+        <img src="https://res.cloudinary.com/dwrmw2cgc/image/upload/v1764091782/15211-1584478466055_cww1vl.jpg" alt="Avatar do chatbot" />
+      </div>
+      <div class="chat-title">Atendente Virtual</div>
+      <button id="closeChat" class="close-btn" aria-label="Fechar chat">×</button>
+    </div>
+
+    <div id="messages" class="messages" aria-live="polite"></div>
+
+    <div class="docs-area" id="docsArea" style="display:none">
+      <strong>Documentos encontrados:</strong>
+      <div id="docsList"></div>
+    </div>
+
+    <div class="input-area">
+      <input id="userInput" type="text" placeholder="Escreva sua pergunta e pressione Enter..." aria-label="Mensagem"/>
+      <button id="sendBtn">Enviar</button>
+    </div>
+  </div>
+
+  <script>
+    // util: escape para evitar injeção de HTML nas mensagens do usuário
+    function escapeHtml(text){
+      const map = { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' };
+      return String(text).replace(/[&<>"']/g, m => map[m]);
+    }
+
+    // seleção de elementos com checagem
+    const chatToggle = document.getElementById('chatToggle');
+    const chatWindow = document.getElementById('chatWindow');
+    const closeChat = document.getElementById('closeChat');
+    const messagesEl = document.getElementById('messages');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const docsArea = document.getElementById('docsArea');
+    const docsList = document.getElementById('docsList');
+
+    // Banco mínimo de documentos/respostas (você pode estender)
+    const documentos = [
+        {
+        nome: "declaração de matrícula",
+        palavras: ["declaração", "matrícula", "declaração de matrícula"],
+        link: "https://www.pm.sc.gov.br/"
+        },
+        {
+            nome: "atestado de frequência",
+            palavras: ["atestado", "frequência", "atestado de frequência"],
+            link: "https://www.pm.sc.gov.br/"
+        },
+        {
+            nome: "histórico escola",
+            palavras: ["histórico", "escolar", "histórico escolar"],
+            link: "https://www.pm.sc.gov.br/"
+        },
+        {
+            nome: "boletim financeiro",
+            palavras: ["boletim", "financeiro", "boleto", "mensalidade"],
+            link: "https://www.pm.sc.gov.br/"
+        }
+    ];
+
+    // Abertura / fechamento
+    chatToggle.addEventListener('click', () => {
+      chatWindow.style.display = 'flex';
+      userInput.focus();
+    });
+    closeChat.addEventListener('click', () => {
+      chatWindow.style.display = 'none';
+    });
+
+    // Enviar por botão ou Enter
+    sendBtn.addEventListener('click', sendMessage);
+    userInput.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter') sendMessage();
+    });
+
+    // Função que adiciona mensagens ao painel
+    function appendMessage(text, sender='bot'){
+      const div = document.createElement('div');
+      div.className = 'msg ' + (sender === 'user' ? 'user' : 'bot');
+      div.innerHTML = text;
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    // função principal de envio
+    function sendMessage(){
+      const raw = userInput.value.trim();
+      if(!raw) return;
+      // exibir texto do usuário (escape)
+      appendMessage(escapeHtml(raw), 'user');
+      userInput.value = '';
+      userInput.focus();
+
+      // resposta simulada
+      setTimeout(() => {
+        const resp = botReply(raw.toLowerCase());
+        appendMessage(resp, 'bot');
+      }, 400);
+    }
+
+    // função que procura documentos por palavras-chave e retorna resposta HTML
+    function botReply(text) {
+
+  // tenta localizar documento
+  const respostaDoc = buscarDocumento(text);
+  if (!respostaDoc.includes("Não encontrei")) {
+      // documento encontrado → mostra painel visual + resposta
+      const encontrados = documentos.filter(doc =>
+        doc.palavras.some(p => text.includes(p))
+      );
+      showDocs(encontrados);
+      return respostaDoc;
+  }
+
+  // regras simples
+  if(text.includes('documento') || text.includes('formulário')){
+      showDocs(documentos);
+      return "Aqui estão alguns documentos úteis que você pode acessar!";
+  }
+
+  if(text.includes('pós') || text.includes('pos') || text.includes('especialização')){
+      return "Os cursos de pós-graduação estão disponíveis no portal oficial da pós.";
+  }
+
+  if(text.includes('horário') || text.includes('grade') || text.includes('aulas')){
+      return "Você pode consultar os horários no Calendário Acadêmico.";
+  }
+
+  if(text.includes('biblioteca')){
+      return "Informações da biblioteca podem ser encontradas no Sistema de Bibliotecas.";
+  }
+
+  if(text.includes('contato') || text.includes('telefone') || text.includes('email')){
+      return "Secretaria Acadêmica: secretaria@faculdade.br — (00) 0000-0000";
+  }
+
+  return "Não encontrei exatamente isso. Tente perguntar por: documentos, pós-graduação, horários, biblioteca ou contato.";
+}
+
+    function showDocs(lista){
+      docsList.innerHTML = '';
+      lista.forEach(d => {
+        const el = document.createElement('div');
+        el.className = 'doc-item';
+        el.textContent = d;
+        docsList.appendChild(el);
+      });
+      docsArea.style.display = lista.length ? 'block' : 'none';
+      // rolar mensagens para baixo (opcional)
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    // mensagem de boas-vindas inicial (opcional)
+    appendMessage("Olá! Eu sou o assistente virtual. Posso ajudar com documentos, pós-graduação, horários e muito mais. Pergunte algo!", 'bot');
+
+   function buscarDocumento(mensagem) {
+    mensagem = mensagem.toLowerCase();
+
+    for (let doc of documentos) {
+        if (doc.palavras.some(p => mensagem.includes(p))) {
+            return `Encontrei! 📄<br>
+<strong>${doc.nome}</strong><br>
+Acesse aqui: <a href="${doc.link}" target="_blank">${doc.link}</a>`;
+        }
+    }
+    return "Não encontrei esse documento. Você pode escrever ele de outra forma?";
+}
+
+  </script>
+</body>
+</html>
