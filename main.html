@@ -4,34 +4,72 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Chatbot UnC - Protótipo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+
   <style>
     :root{
       --primary:#1d3557;
       --bg:#f5f5f5;
     }
-    body{
-      margin:0;
-      font-family:Arial,system-ui,-apple-system,"Segoe UI",Roboto;
-      background:var(--bg);
-      -webkit-font-smoothing:antialiased;
-    }
+
+  body{
+    margin:0;
+    font-family:Arial,system-ui,-apple-system,"Segoe UI",Roboto;
+
+    /* 🔥 Aqui está o fundo com imagem */
+    background-image: url('https://res.cloudinary.com/dwrmw2cgc/image/upload/v1765309263/premium_photo-1677567996070-68fa4181775a_sldpmt.jpg'); 
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+
+    min-height: 100vh;
+    -webkit-font-smoothing:antialiased;
+  }
 
     /* Botão flutuante */
     #chatToggle{
-      position:fixed;
-      right:20px;
-      bottom:20px;
-      width:60px;height:60px;border-radius:50%;
-      background:var(--primary);color:#fff;border:0;
-      font-size:26px;cursor:pointer;z-index:2000;
-      box-shadow:0 6px 18px rgba(0,0,0,.18);
-    }
+    position:fixed;
+    right:25px;
+    bottom:25px;
+    width:80px;
+    height:80px;
+    border-radius:50%;
+    background:var(--primary);
+    color:#fff;
+    border:0;
+    font-size:38px;
+    cursor:pointer;
+    z-index:1300;
+
+  /* animação adicionada */
+  animation: pulse 2.6s infinite ease-in-out;
+}
+
+
+/* Animação de pulso e brilho */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(29, 53, 87, 0.4);
+  }
+  50% {
+    transform: scale(1.12);
+    box-shadow: 0 0 16px rgba(255, 255, 255, 0.8);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(29, 53, 87, 0.4);
+  }
+}
+
+
 
     /* Janela de chat (pop-up) */
     #chatWindow{
       position:fixed;
-      right:20px;
-      bottom:90px;
+      right:30px;
+      bottom:120px;
       width:360px;
       max-width:calc(100vw - 40px);
       height:520px;
@@ -68,7 +106,34 @@
     .docs-area{padding:10px;border-top:1px dashed #eee;background:#fff}
     .doc-item{background:#f4f7fb;padding:8px;border-radius:6px;margin-bottom:8px;font-size:14px}
     a.inline-link{color:var(--primary);text-decoration:none;font-weight:600}
+
+    .actions-area{
+  padding:12px;
+  border-top:1px solid #eee;
+  background:#fafafa;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.action-btn{
+  padding:12px;
+  background:var(--primary);
+  color:white;
+  border:0;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:15px;
+  text-align:left;
+  transition:0.2s;
+}
+
+.action-btn:hover{
+  opacity:0.85;
+}
+
   </style>
+
 </head>
 <body>
 
@@ -93,10 +158,16 @@
       <div id="docsList"></div>
     </div>
 
-    <div class="input-area">
-      <input id="userInput" type="text" placeholder="Escreva sua pergunta e pressione Enter..." aria-label="Mensagem"/>
-      <button id="sendBtn">Enviar</button>
-    </div>
+    <!-- Lista de ações -->
+<div id="actionsArea" class="actions-area">
+  <button class="action-btn" data-action="documentos">📄 Consultar documentos</button>
+  <button class="action-btn" data-action="pos">🎓 Ver informações da pós-graduação</button>
+  <button class="action-btn" data-action="horarios">📅 Ver horários e aulas</button>
+  <button class="action-btn" data-action="biblioteca">📚 Informações da biblioteca</button>
+  <button class="action-btn" data-action="contato">☎️ Contatos da instituição</button>
+</div>
+
+
   </div>
 
   <script>
@@ -116,29 +187,6 @@
     const docsArea = document.getElementById('docsArea');
     const docsList = document.getElementById('docsList');
 
-    // Banco mínimo de documentos/respostas (você pode estender)
-    const documentos = [
-        {
-        nome: "declaração de matrícula",
-        palavras: ["declaração", "matrícula", "declaração de matrícula"],
-        },
-        {
-            nome: "atestado de frequência",
-            palavras: ["atestado", "frequência", "atestado de frequência"],
-            link: "https://www.pm.sc.gov.br/"
-        },
-        {
-            nome: "histórico escola",
-            palavras: ["histórico", "escolar", "histórico escolar"],
-            link: "https://www.pm.sc.gov.br/"
-        },
-        {
-            nome: "boletim financeiro",
-            palavras: ["boletim", "financeiro", "boleto", "mensalidade"],
-            link: "https://www.pm.sc.gov.br/"
-        }
-    ];
-
     // Abertura / fechamento
     chatToggle.addEventListener('click', () => {
       chatWindow.style.display = 'flex';
@@ -148,50 +196,9 @@
       chatWindow.style.display = 'none';
     });
 
-    // Enviar por botão ou Enter
-    sendBtn.addEventListener('click', sendMessage);
-    userInput.addEventListener('keydown', (e) => {
-      if(e.key === 'Enter') sendMessage();
-    });
-
-    // Função que adiciona mensagens ao painel
-    function appendMessage(text, sender='bot'){
-      const div = document.createElement('div');
-      div.className = 'msg ' + (sender === 'user' ? 'user' : 'bot');
-      div.innerHTML = text;
-      messagesEl.appendChild(div);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-
-    // função principal de envio
-    function sendMessage(){
-      const raw = userInput.value.trim();
-      if(!raw) return;
-      // exibir texto do usuário (escape)
-      appendMessage(escapeHtml(raw), 'user');
-      userInput.value = '';
-      userInput.focus();
-
-      // resposta simulada
-      setTimeout(() => {
-        const resp = botReply(raw.toLowerCase());
-        appendMessage(resp, 'bot');
-      }, 400);
-    }
-
     // função que procura documentos por palavras-chave e retorna resposta HTML
     function botReply(text) {
 
-  // tenta localizar documento
-  const respostaDoc = buscarDocumento(text);
-  if (!respostaDoc.includes("Não encontrei")) {
-      // documento encontrado → mostra painel visual + resposta
-      const encontrados = documentos.filter(doc =>
-        doc.palavras.some(p => text.includes(p))
-      );
-      showDocs(encontrados);
-      return respostaDoc;
-  }
 
   // regras simples
   if(text.includes('documento') || text.includes('formulário')){
@@ -246,6 +253,43 @@ Acesse aqui: <a href="${doc.link}" target="_blank">${doc.link}</a>`;
     }
     return "Não encontrei esse documento. Você pode escrever ele de outra forma?";
 }
+
+// Ações rápidas do chatbot
+document.querySelectorAll(".action-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+      const action = btn.dataset.action;
+      
+      switch(action){
+
+          case "documentos":
+              appendMessage("Você selecionou: Consulta de documentos", "user");
+              showDocs(documentos);
+              appendMessage("Aqui estão os documentos disponíveis para download:", "bot");
+          break;
+
+          case "pos":
+              appendMessage("Você selecionou: Pós-graduação", "user");
+              appendMessage("Os cursos de pós-graduação podem ser acessados no portal oficial da UnC.", "bot");
+          break;
+
+          case "horarios":
+              appendMessage("Você selecionou: Horários e Aulas", "user");
+              appendMessage("Os horários das aulas estão disponíveis no Calendário Acadêmico.", "bot");
+          break;
+
+          case "biblioteca":
+              appendMessage("Você selecionou: Biblioteca", "user");
+              appendMessage("A biblioteca oferece diversos serviços. Consulte mais no Sistema de Bibliotecas da UnC.", "bot");
+          break;
+
+          case "contato":
+              appendMessage("Você selecionou: Contatos da Instituição", "user");
+              appendMessage("Secretaria Acadêmica: secretaria@faculdade.br — (00) 0000-0000", "bot");
+          break;
+      }
+  });
+});
+
 
   </script>
 </body>
